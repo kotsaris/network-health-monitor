@@ -1,6 +1,6 @@
 # Network Health Monitor
 
-A lightweight Windows desktop widget that monitors network health by pinging Google DNS (8.8.8.8) and Cloudflare DNS (1.1.1.1).
+A lightweight Windows desktop widget that continuously monitors network health by pinging Google DNS (8.8.8.8) and Cloudflare DNS (1.1.1.1) every 5 seconds.
 
 ![Widget](screenshots/widget.png)
 
