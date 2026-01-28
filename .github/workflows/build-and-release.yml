@@ -1,0 +1,82 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Publish self-contained
+        run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./publish-selfcontained
+
+      - name: Publish framework-dependent
+        run: dotnet publish -c Release --no-self-contained -o ./publish-framework-dependent
+
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix
+
+      - name: Build MSI
+        run: |
+          wix build installer/Product.wxs -d PublishDir=./publish-framework-dependent -o ./NetworkHealthMonitor.msi
+
+      - name: Upload self-contained artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetworkHealthMonitor-SelfContained
+          path: ./publish-selfcontained/NetworkHealthMonitor.exe
+
+      - name: Zip framework-dependent
+        run: Compress-Archive -Path ./publish-framework-dependent/* -DestinationPath ./NetworkHealthMonitor-FrameworkDependent.zip
+
+      - name: Upload framework-dependent artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetworkHealthMonitor-FrameworkDependent
+          path: ./NetworkHealthMonitor-FrameworkDependent.zip
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetworkHealthMonitor-MSI
+          path: ./NetworkHealthMonitor.msi
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            NetworkHealthMonitor-SelfContained/NetworkHealthMonitor.exe
+            NetworkHealthMonitor-FrameworkDependent/NetworkHealthMonitor-FrameworkDependent.zip
+            NetworkHealthMonitor-MSI/NetworkHealthMonitor.msi
+          generate_release_notes: true

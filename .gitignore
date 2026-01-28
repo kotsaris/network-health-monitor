@@ -34,3 +34,7 @@ packages/
 
 # Debug logs
 *.log
+
+# MSI output
+*.msi
+*.wixpdb
