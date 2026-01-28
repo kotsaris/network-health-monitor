@@ -230,6 +230,12 @@ public class WidgetForm : Form
 
         // Update tooltip
         _trayIcon.Text = _monitor.GetTooltipText();
+
+        // Update details form if visible
+        if (_detailsForm != null && !_detailsForm.IsDisposed && _detailsForm.Visible)
+        {
+            _detailsForm.UpdateStats(stats);
+        }
     }
 
     private void SnapToTaskbar()
