@@ -136,8 +136,11 @@ public class WidgetForm : Form
         MouseMove += OnMouseMove;
         MouseUp += OnMouseUp;
 
-        // Double-click to show details
+        // Double-click to show details (on form and all child controls)
         DoubleClick += (s, e) => ShowDetailsForm();
+        _statusIndicator.DoubleClick += (s, e) => ShowDetailsForm();
+        _latencyLabel.DoubleClick += (s, e) => ShowDetailsForm();
+        _lossLabel.DoubleClick += (s, e) => ShowDetailsForm();
 
         // Right-click menu
         var widgetMenu = new ContextMenuStrip();
