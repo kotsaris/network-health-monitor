@@ -1,0 +1,36 @@
+# Build results
+bin/
+obj/
+
+# Publish output
+publish/
+publish-small/
+publish-trimmed/
+publish-framework-dependent/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VS Code
+.vscode/
+
+# Visual Studio
+.vs/
+
+# Rider
+.idea/
+
+# Build artifacts
+*.dll
+*.exe
+*.pdb
+
+# NuGet
+*.nupkg
+packages/
+
+# Debug logs
+*.log
