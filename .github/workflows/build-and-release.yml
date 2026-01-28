@@ -39,14 +39,14 @@ jobs:
         run: |
           wix build installer/Product.wxs -d PublishDir=./publish-framework-dependent -o ./NetworkHealthMonitor.msi
 
+      - name: Zip framework-dependent
+        run: Compress-Archive -Path ./publish-framework-dependent/* -DestinationPath ./NetworkHealthMonitor-FrameworkDependent.zip
+
       - name: Upload self-contained artifact
         uses: actions/upload-artifact@v4
         with:
           name: NetworkHealthMonitor-SelfContained
           path: ./publish-selfcontained/NetworkHealthMonitor.exe
-
-      - name: Zip framework-dependent
-        run: Compress-Archive -Path ./publish-framework-dependent/* -DestinationPath ./NetworkHealthMonitor-FrameworkDependent.zip
 
       - name: Upload framework-dependent artifact
         uses: actions/upload-artifact@v4
@@ -63,7 +63,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
 
     permissions:
       contents: write
@@ -72,9 +72,30 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
+      - name: Get version info
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Delete existing latest release
+        if: steps.version.outputs.tag == 'latest'
+        run: gh release delete latest --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag == 'latest' && 'Latest Build' || steps.version.outputs.tag }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             NetworkHealthMonitor-SelfContained/NetworkHealthMonitor.exe
             NetworkHealthMonitor-FrameworkDependent/NetworkHealthMonitor-FrameworkDependent.zip
