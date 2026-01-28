@@ -9,18 +9,18 @@
     <MediaTemplate EmbedCab="yes" />
 
     <Feature Id="ProductFeature" Title="Network Health Monitor" Level="1">
-      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="MainExecutable" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="StartupShortcut" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="NetworkHealthMonitor">
-        <Component Id="ProductComponents" Guid="B2C3D4E5-F6A7-8901-BCDE-F23456789012">
-          <File Id="MainExecutable" Source="$(var.PublishDir)\NetworkHealthMonitor.exe" KeyPath="yes" />
+        <Component Id="MainExecutable" Guid="B2C3D4E5-F6A7-8901-BCDE-F23456789012">
+          <File Id="MainExe" Source="$(var.PublishDir)\NetworkHealthMonitor.exe" KeyPath="yes" />
+          <File Id="MainDll" Source="$(var.PublishDir)\NetworkHealthMonitor.dll" />
           <File Id="DepsJson" Source="$(var.PublishDir)\NetworkHealthMonitor.deps.json" />
           <File Id="RuntimeConfig" Source="$(var.PublishDir)\NetworkHealthMonitor.runtimeconfig.json" />
-          <File Id="MainDll" Source="$(var.PublishDir)\NetworkHealthMonitor.dll" />
         </Component>
       </Directory>
     </StandardDirectory>
