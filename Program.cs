@@ -1,11 +1,28 @@
+using System.Runtime.InteropServices;
+
 namespace NetworkHealthMonitor;
 
 static class Program
 {
+    [DllImport("kernel32.dll")]
+    private static extern bool SetConsoleCtrlHandler(ConsoleCtrlDelegate handler, bool add);
+
+    private delegate bool ConsoleCtrlDelegate(int sig);
+
+    private static bool ConsoleCtrlHandler(int sig)
+    {
+        // Ctrl+C = 0, Ctrl+Break = 1, Close = 2
+        Environment.Exit(0);
+        return true;
+    }
+
     [STAThread]
     static void Main()
     {
         ApplicationConfiguration.Initialize();
+
+        // Handle Ctrl+C from console
+        SetConsoleCtrlHandler(ConsoleCtrlHandler, true);
 
         // Single instance check
         using var mutex = new Mutex(true, "NetworkHealthMonitor_SingleInstance", out bool isNew);
@@ -15,13 +32,6 @@ static class Program
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-
-        // Handle Ctrl+C from console
-        Console.CancelKeyPress += (s, e) =>
-        {
-            e.Cancel = true;
-            Application.Exit();
-        };
 
         Application.Run(new WidgetForm());
     }

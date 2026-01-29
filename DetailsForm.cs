@@ -1,3 +1,5 @@
+using System.Drawing.Drawing2D;
+
 namespace NetworkHealthMonitor;
 
 public partial class DetailsForm : Form
@@ -23,12 +25,12 @@ public partial class DetailsForm : Form
     {
         SuspendLayout();
 
-        // Enable DPI scaling
+        // Let WinForms handle DPI scaling via PerMonitorV2
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96F, 96F);
 
         Text = "Network Health Monitor";
-        Size = new Size(420, 480);
+        ClientSize = new Size(500, 520);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
@@ -40,29 +42,30 @@ public partial class DetailsForm : Form
         var headerPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 50,
+            Height = 60,
             BackColor = Color.FromArgb(45, 45, 45)
         };
 
+        int indicatorSize = 20;
         _statusIndicator = new Panel
         {
-            Size = new Size(16, 16),
-            Location = new Point(15, 17),
-            BackColor = Color.Red
+            Size = new Size(indicatorSize, indicatorSize),
+            Location = new Point(20, 20),
+            BackColor = Color.Gray
         };
-        _statusIndicator.Paint += (s, e) =>
+        // Create circular region
+        using (var path = new GraphicsPath())
         {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using var brush = new SolidBrush(_statusIndicator.BackColor);
-            e.Graphics.FillEllipse(brush, 0, 0, _statusIndicator.Width - 1, _statusIndicator.Height - 1);
-        };
+            path.AddEllipse(0, 0, indicatorSize, indicatorSize);
+            _statusIndicator.Region = new Region(path);
+        }
 
         _statusLabel = new Label
         {
             Text = "Checking...",
-            Location = new Point(40, 15),
+            Location = new Point(50, 17),
             AutoSize = true,
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 14F, FontStyle.Bold),
             ForeColor = Color.White
         };
 
@@ -73,18 +76,18 @@ public partial class DetailsForm : Form
         // Content panel
         var contentPanel = new Panel
         {
-            Location = new Point(0, 50),
-            Size = new Size(420, 400),
+            Location = new Point(0, 60),
+            Size = new Size(500, 460),
             AutoScroll = true,
-            Padding = new Padding(10)
+            Padding = new Padding(15)
         };
 
-        int yOffset = 10;
+        int yOffset = 15;
         foreach (var target in _monitor.GetTargets())
         {
             var targetPanel = CreateTargetPanel(target, yOffset);
             contentPanel.Controls.Add(targetPanel);
-            yOffset += 175;
+            yOffset += 210;
         }
 
         Controls.Add(contentPanel);
@@ -96,8 +99,8 @@ public partial class DetailsForm : Form
     {
         var panel = new Panel
         {
-            Location = new Point(10, yOffset),
-            Size = new Size(380, 165),
+            Location = new Point(15, yOffset),
+            Size = new Size(450, 195),
             BackColor = Color.FromArgb(45, 45, 45)
         };
 
@@ -105,19 +108,20 @@ public partial class DetailsForm : Form
         var targetLabel = new Label
         {
             Text = target,
-            Location = new Point(10, 8),
+            Location = new Point(15, 12),
             AutoSize = true,
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
             ForeColor = Color.FromArgb(100, 180, 255)
         };
         panel.Controls.Add(targetLabel);
 
-        // Current latency
+        // Row 1: Current and Min/Max
         var currentLabel = new Label
         {
             Text = "Current:",
-            Location = new Point(10, 35),
+            Location = new Point(15, 48),
             AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
             ForeColor = Color.LightGray
         };
         panel.Controls.Add(currentLabel);
@@ -125,40 +129,20 @@ public partial class DetailsForm : Form
         var currentValueLabel = new Label
         {
             Text = "-- ms",
-            Location = new Point(100, 35),
+            Location = new Point(90, 48),
             AutoSize = true,
             ForeColor = Color.White,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
         };
         panel.Controls.Add(currentValueLabel);
         _currentLatencyLabels[target] = currentValueLabel;
 
-        // Average latency
-        var avgLabel = new Label
-        {
-            Text = "Average:",
-            Location = new Point(10, 55),
-            AutoSize = true,
-            ForeColor = Color.LightGray
-        };
-        panel.Controls.Add(avgLabel);
-
-        var avgValueLabel = new Label
-        {
-            Text = "-- ms",
-            Location = new Point(100, 55),
-            AutoSize = true,
-            ForeColor = Color.White
-        };
-        panel.Controls.Add(avgValueLabel);
-        _avgLatencyLabels[target] = avgValueLabel;
-
-        // Min/Max
         var minMaxLabel = new Label
         {
             Text = "Min/Max:",
-            Location = new Point(180, 35),
+            Location = new Point(230, 48),
             AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
             ForeColor = Color.LightGray
         };
         panel.Controls.Add(minMaxLabel);
@@ -166,19 +150,42 @@ public partial class DetailsForm : Form
         var minMaxValueLabel = new Label
         {
             Text = "-- / -- ms",
-            Location = new Point(250, 35),
+            Location = new Point(310, 48),
             AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
             ForeColor = Color.White
         };
         panel.Controls.Add(minMaxValueLabel);
         _minMaxLabels[target] = minMaxValueLabel;
 
-        // Packet loss
+        // Row 2: Average and Packet Loss
+        var avgLabel = new Label
+        {
+            Text = "Average:",
+            Location = new Point(15, 75),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
+            ForeColor = Color.LightGray
+        };
+        panel.Controls.Add(avgLabel);
+
+        var avgValueLabel = new Label
+        {
+            Text = "-- ms",
+            Location = new Point(90, 75),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
+            ForeColor = Color.White
+        };
+        panel.Controls.Add(avgValueLabel);
+        _avgLatencyLabels[target] = avgValueLabel;
+
         var lossLabel = new Label
         {
             Text = "Packet Loss:",
-            Location = new Point(180, 55),
+            Location = new Point(230, 75),
             AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
             ForeColor = Color.LightGray
         };
         panel.Controls.Add(lossLabel);
@@ -186,28 +193,29 @@ public partial class DetailsForm : Form
         var lossValueLabel = new Label
         {
             Text = "0.0%",
-            Location = new Point(270, 55),
+            Location = new Point(330, 75),
             AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
             ForeColor = Color.White
         };
         panel.Controls.Add(lossValueLabel);
         _packetLossLabels[target] = lossValueLabel;
 
-        // Graph panel
+        // Graph section
         var graphLabel = new Label
         {
             Text = "Latency History (last 60 pings)",
-            Location = new Point(10, 80),
+            Location = new Point(15, 108),
             AutoSize = true,
             ForeColor = Color.Gray,
-            Font = new Font("Segoe UI", 8F)
+            Font = new Font("Segoe UI", 8.5F)
         };
         panel.Controls.Add(graphLabel);
 
         var graphPanel = new Panel
         {
-            Location = new Point(10, 98),
-            Size = new Size(360, 60),
+            Location = new Point(15, 130),
+            Size = new Size(420, 55),
             BackColor = Color.FromArgb(25, 25, 25),
             BorderStyle = BorderStyle.FixedSingle
         };
@@ -220,7 +228,7 @@ public partial class DetailsForm : Form
 
     private void DrawGraph(Graphics g, string target, Size size)
     {
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.FromArgb(25, 25, 25));
 
         var stats = _monitor.GetStats();
@@ -234,11 +242,11 @@ public partial class DetailsForm : Form
                                                .Max());
 
         // Draw threshold lines
-        using var thresholdPen = new Pen(Color.FromArgb(60, 255, 255, 0), 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+        using var thresholdPen = new Pen(Color.FromArgb(60, 255, 255, 0), 1) { DashStyle = DashStyle.Dot };
         var y100 = size.Height - (int)(100.0 / maxLatency * (size.Height - 10)) - 5;
         var y200 = size.Height - (int)(200.0 / maxLatency * (size.Height - 10)) - 5;
         g.DrawLine(thresholdPen, 0, y100, size.Width, y100);
-        using var redThresholdPen = new Pen(Color.FromArgb(60, 255, 0, 0), 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+        using var redThresholdPen = new Pen(Color.FromArgb(60, 255, 0, 0), 1) { DashStyle = DashStyle.Dot };
         g.DrawLine(redThresholdPen, 0, y200, size.Width, y200);
 
         // Draw latency line

@@ -12,6 +12,7 @@ public class WidgetForm : Form
     private Label _latencyLabel = null!;
     private Label _lossLabel = null!;
     private Panel _statusIndicator = null!;
+    private Label _closeBtn = null!;
 
     private bool _isDragging;
     private Point _dragStart;
@@ -37,6 +38,12 @@ public class WidgetForm : Form
         public int Left, Top, Right, Bottom;
     }
 
+    // Base dimensions at 96 DPI (100% scaling)
+    private const int BaseWidth = 150;
+    private const int BaseHeight = 58;
+    private const int BaseIndicatorSize = 18;
+    private const int BaseCornerRadius = 10;
+
     public WidgetForm()
     {
         _monitor = new NetworkMonitor();
@@ -44,11 +51,6 @@ public class WidgetForm : Form
         _monitor.StatsUpdated += OnStatsUpdated;
 
         InitializeWidget();
-        InitializeTrayIcon();
-
-        // Timer to keep widget positioned near taskbar
-        _positionTimer = new System.Windows.Forms.Timer { Interval = 1000 };
-        _positionTimer.Tick += (s, e) => EnsureVisibleOnScreen();
 
         _trayIcon = new NotifyIcon
         {
@@ -65,86 +67,33 @@ public class WidgetForm : Form
         _trayIcon.ContextMenuStrip = menu;
         _trayIcon.DoubleClick += (s, e) => ShowDetailsForm();
 
+        // Timer to keep widget positioned near taskbar
+        _positionTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        _positionTimer.Tick += (s, e) => EnsureVisibleOnScreen();
+
         SnapToTaskbar();
         _monitor.Start();
     }
 
+    private float ScaleFactor => DeviceDpi / 96f;
+    private int Scale(int value) => (int)(value * ScaleFactor);
+
     private void InitializeWidget()
     {
-        // Enable DPI scaling
-        AutoScaleMode = AutoScaleMode.Dpi;
-        AutoScaleDimensions = new SizeF(96F, 96F);
+        SuspendLayout();
 
         // Borderless, tool window (doesn't show in taskbar)
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
-        Size = new Size(120, 40);
         BackColor = Color.FromArgb(40, 40, 40);
 
-        // Rounded corners
-        Region = CreateRoundedRegion(Width, Height, 8);
-
-        // Status indicator (colored circle)
-        _statusIndicator = new Panel
-        {
-            Size = new Size(12, 12),
-            Location = new Point(8, 14),
-            BackColor = Color.Gray
-        };
-        _statusIndicator.Paint += PaintStatusIndicator;
-        Controls.Add(_statusIndicator);
-
-        // Latency label
-        _latencyLabel = new Label
-        {
-            Text = "-- ms",
-            Location = new Point(26, 5),
-            Size = new Size(60, 16),
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            BackColor = Color.Transparent
-        };
-        Controls.Add(_latencyLabel);
-
-        // Loss label
-        _lossLabel = new Label
-        {
-            Text = "0% loss",
-            Location = new Point(26, 21),
-            Size = new Size(60, 14),
-            ForeColor = Color.LightGray,
-            Font = new Font("Segoe UI", 7.5F),
-            BackColor = Color.Transparent
-        };
-        Controls.Add(_lossLabel);
-
-        // Close button
-        var closeBtn = new Label
-        {
-            Text = "×",
-            Location = new Point(100, 2),
-            Size = new Size(16, 16),
-            ForeColor = Color.Gray,
-            Font = new Font("Segoe UI", 10F),
-            Cursor = Cursors.Hand,
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-        closeBtn.Click += (s, e) => Hide();
-        closeBtn.MouseEnter += (s, e) => closeBtn.ForeColor = Color.White;
-        closeBtn.MouseLeave += (s, e) => closeBtn.ForeColor = Color.Gray;
-        Controls.Add(closeBtn);
+        ApplyScaledLayout();
 
         // Dragging support
         MouseDown += OnMouseDown;
         MouseMove += OnMouseMove;
         MouseUp += OnMouseUp;
-
-        // Double-click to show details (on form and all child controls)
-        DoubleClick += (s, e) => ShowDetailsForm();
-        _statusIndicator.DoubleClick += (s, e) => ShowDetailsForm();
-        _latencyLabel.DoubleClick += (s, e) => ShowDetailsForm();
-        _lossLabel.DoubleClick += (s, e) => ShowDetailsForm();
 
         // Right-click menu
         var widgetMenu = new ContextMenuStrip();
@@ -154,11 +103,88 @@ public class WidgetForm : Form
         widgetMenu.Items.Add("Hide Widget", null, (s, e) => Hide());
         widgetMenu.Items.Add("Exit", null, (s, e) => ExitApplication());
         ContextMenuStrip = widgetMenu;
+
+        ResumeLayout(true);
     }
 
-    private void InitializeTrayIcon()
+    private void ApplyScaledLayout()
     {
-        // Tray icon already set up in constructor
+        // Scale form size
+        Size = new Size(Scale(BaseWidth), Scale(BaseHeight));
+        Region = CreateRoundedRegion(Width, Height, Scale(BaseCornerRadius));
+
+        // Clear existing controls if rebuilding
+        Controls.Clear();
+
+        // Status indicator (colored circle)
+        int indicatorSize = Scale(BaseIndicatorSize);
+        _statusIndicator = new Panel
+        {
+            Size = new Size(indicatorSize, indicatorSize),
+            Location = new Point(Scale(12), Scale(20)),
+            BackColor = Color.Gray
+        };
+        using (var path = new GraphicsPath())
+        {
+            path.AddEllipse(0, 0, indicatorSize, indicatorSize);
+            _statusIndicator.Region = new Region(path);
+        }
+        _statusIndicator.DoubleClick += (s, e) => ShowDetailsForm();
+        Controls.Add(_statusIndicator);
+
+        // Latency label - don't scale font, Windows handles that
+        _latencyLabel = new Label
+        {
+            Text = "-- ms",
+            Location = new Point(Scale(36), Scale(8)),
+            AutoSize = true,
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            BackColor = Color.Transparent
+        };
+        _latencyLabel.DoubleClick += (s, e) => ShowDetailsForm();
+        Controls.Add(_latencyLabel);
+
+        // Loss label
+        _lossLabel = new Label
+        {
+            Text = "0.0% loss",
+            Location = new Point(Scale(36), Scale(32)),
+            AutoSize = true,
+            ForeColor = Color.LightGray,
+            Font = new Font("Segoe UI", 8.5F),
+            BackColor = Color.Transparent
+        };
+        _lossLabel.DoubleClick += (s, e) => ShowDetailsForm();
+        Controls.Add(_lossLabel);
+
+        // Close button
+        _closeBtn = new Label
+        {
+            Text = "\u00d7",
+            Location = new Point(Scale(BaseWidth - 24), Scale(4)),
+            Size = new Size(Scale(20), Scale(20)),
+            ForeColor = Color.Gray,
+            Font = new Font("Segoe UI", 10F),
+            Cursor = Cursors.Hand,
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+        _closeBtn.Click += (s, e) => Hide();
+        _closeBtn.MouseEnter += (s, e) => _closeBtn.ForeColor = Color.White;
+        _closeBtn.MouseLeave += (s, e) => _closeBtn.ForeColor = Color.Gray;
+        Controls.Add(_closeBtn);
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+
+        SuspendLayout();
+        ApplyScaledLayout();
+        ResumeLayout(true);
+
+        // Reposition after DPI change
+        SnapToTaskbar();
     }
 
     private static Region CreateRoundedRegion(int width, int height, int radius)
@@ -170,13 +196,6 @@ public class WidgetForm : Form
         path.AddArc(0, height - radius * 2, radius * 2, radius * 2, 90, 90);
         path.CloseAllFigures();
         return new Region(path);
-    }
-
-    private void PaintStatusIndicator(object? sender, PaintEventArgs e)
-    {
-        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using var brush = new SolidBrush(_statusIndicator.BackColor);
-        e.Graphics.FillEllipse(brush, 0, 0, _statusIndicator.Width - 1, _statusIndicator.Height - 1);
     }
 
     private void OnHealthStatusChanged(object? sender, HealthStatus status)
@@ -196,9 +215,10 @@ public class WidgetForm : Form
         };
 
         _statusIndicator.BackColor = color;
-        _statusIndicator.Invalidate();
-
-        _trayIcon.Icon = CreateStatusIcon(color);
+        if (_trayIcon != null)
+        {
+            _trayIcon.Icon = CreateStatusIcon(color);
+        }
     }
 
     private void OnStatsUpdated(object? sender, EventArgs e)
@@ -211,7 +231,6 @@ public class WidgetForm : Form
 
         var stats = _monitor.GetStats();
 
-        // Get best latency from all targets
         var latencies = stats.Values
             .Where(s => s.CurrentLatency.HasValue)
             .Select(s => s.CurrentLatency!.Value)
@@ -230,15 +249,19 @@ public class WidgetForm : Form
             _latencyLabel.ForeColor = Color.Red;
         }
 
-        var avgLoss = stats.Values.Average(s => s.PacketLossPercent);
-        _lossLabel.Text = $"{avgLoss:F1}% loss";
-        _lossLabel.ForeColor = avgLoss > 5 ? Color.Red :
-                               avgLoss > 0 ? Color.Yellow : Color.LightGray;
+        if (stats.Values.Any())
+        {
+            var avgLoss = stats.Values.Average(s => s.PacketLossPercent);
+            _lossLabel.Text = $"{avgLoss:F1}% loss";
+            _lossLabel.ForeColor = avgLoss > 5 ? Color.Red :
+                                   avgLoss > 0 ? Color.Yellow : Color.LightGray;
+        }
 
-        // Update tooltip
-        _trayIcon.Text = _monitor.GetTooltipText();
+        if (_trayIcon != null)
+        {
+            _trayIcon.Text = _monitor.GetTooltipText();
+        }
 
-        // Update details form if visible
         if (_detailsForm != null && !_detailsForm.IsDisposed && _detailsForm.Visible)
         {
             _detailsForm.UpdateStats(stats);
@@ -253,31 +276,25 @@ public class WidgetForm : Form
             var screen = Screen.PrimaryScreen!;
             var workingArea = screen.WorkingArea;
 
-            // Determine taskbar position
             if (taskbarRect.Top > workingArea.Bottom - 10)
             {
-                // Taskbar at bottom
                 Location = new Point(workingArea.Right - Width - 10, workingArea.Bottom - Height - 10);
             }
             else if (taskbarRect.Left < workingArea.Left + 10)
             {
-                // Taskbar at left
                 Location = new Point(workingArea.Left + 10, workingArea.Bottom - Height - 10);
             }
             else if (taskbarRect.Top < workingArea.Top + 10)
             {
-                // Taskbar at top
                 Location = new Point(workingArea.Right - Width - 10, workingArea.Top + 10);
             }
             else
             {
-                // Taskbar at right
                 Location = new Point(workingArea.Right - Width - 10, workingArea.Bottom - Height - 10);
             }
         }
         else
         {
-            // Fallback: bottom right
             var screen = Screen.PrimaryScreen!;
             Location = new Point(screen.WorkingArea.Right - Width - 10,
                                  screen.WorkingArea.Bottom - Height - 10);
@@ -386,7 +403,6 @@ public class WidgetForm : Form
     {
         get
         {
-            // Make it a tool window (no taskbar entry) and enable transparency
             var cp = base.CreateParams;
             cp.ExStyle |= 0x80; // WS_EX_TOOLWINDOW
             return cp;
@@ -396,16 +412,7 @@ public class WidgetForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        // Update region after DPI scaling has been applied
-        Region = CreateRoundedRegion(Width, Height, (int)(8 * DeviceDpi / 96.0));
         SendToDesktopLayer();
-    }
-
-    protected override void OnDpiChanged(DpiChangedEventArgs e)
-    {
-        base.OnDpiChanged(e);
-        // Recreate rounded region for new DPI
-        Region = CreateRoundedRegion(Width, Height, (int)(8 * e.DeviceDpiNew / 96.0));
     }
 
     protected override void OnVisibleChanged(EventArgs e)
@@ -419,7 +426,6 @@ public class WidgetForm : Form
 
     private void SendToDesktopLayer()
     {
-        // Send window to bottom of z-order (above desktop, below other windows)
         SetWindowPos(Handle, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 }
