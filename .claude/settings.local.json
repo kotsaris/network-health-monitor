@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd high-DPI scaling support for better display on high-res screens\n\nEnable PerMonitorV2 DPI awareness and configure forms to auto-scale\nfrom 96 DPI baseline. Fixes tiny appearance on high-DPI displays like\n3840x2400 at 250% scaling.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)"
+    ]
+  }
+}
