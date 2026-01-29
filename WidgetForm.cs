@@ -71,6 +71,10 @@ public class WidgetForm : Form
 
     private void InitializeWidget()
     {
+        // Enable DPI scaling
+        AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleDimensions = new SizeF(96F, 96F);
+
         // Borderless, tool window (doesn't show in taskbar)
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
@@ -172,7 +176,7 @@ public class WidgetForm : Form
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var brush = new SolidBrush(_statusIndicator.BackColor);
-        e.Graphics.FillEllipse(brush, 0, 0, 11, 11);
+        e.Graphics.FillEllipse(brush, 0, 0, _statusIndicator.Width - 1, _statusIndicator.Height - 1);
     }
 
     private void OnHealthStatusChanged(object? sender, HealthStatus status)
@@ -392,7 +396,16 @@ public class WidgetForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
+        // Update region after DPI scaling has been applied
+        Region = CreateRoundedRegion(Width, Height, (int)(8 * DeviceDpi / 96.0));
         SendToDesktopLayer();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        // Recreate rounded region for new DPI
+        Region = CreateRoundedRegion(Width, Height, (int)(8 * e.DeviceDpiNew / 96.0));
     }
 
     protected override void OnVisibleChanged(EventArgs e)

@@ -23,6 +23,10 @@ public partial class DetailsForm : Form
     {
         SuspendLayout();
 
+        // Enable DPI scaling
+        AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleDimensions = new SizeF(96F, 96F);
+
         Text = "Network Health Monitor";
         Size = new Size(420, 480);
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -50,7 +54,7 @@ public partial class DetailsForm : Form
         {
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             using var brush = new SolidBrush(_statusIndicator.BackColor);
-            e.Graphics.FillEllipse(brush, 0, 0, 15, 15);
+            e.Graphics.FillEllipse(brush, 0, 0, _statusIndicator.Width - 1, _statusIndicator.Height - 1);
         };
 
         _statusLabel = new Label
