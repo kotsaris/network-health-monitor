@@ -99,11 +99,6 @@ public class NetworkMonitor : IDisposable
                 result.Success = true;
                 result.Latency = reply.RoundtripTime;
                 stats.CurrentLatency = reply.RoundtripTime;
-
-                if (reply.RoundtripTime < stats.MinLatency)
-                    stats.MinLatency = reply.RoundtripTime;
-                if (reply.RoundtripTime > stats.MaxLatency)
-                    stats.MaxLatency = reply.RoundtripTime;
             }
             else
             {
@@ -121,11 +116,18 @@ public class NetworkMonitor : IDisposable
         if (stats.History.Count > MaxHistorySize)
             stats.History.RemoveAt(0);
 
-        // Recalculate stats
+        // Recalculate stats from history window
         var successfulPings = stats.History.Where(r => r.Success && r.Latency.HasValue).ToList();
         if (successfulPings.Count > 0)
         {
             stats.AverageLatency = successfulPings.Average(r => r.Latency!.Value);
+            stats.MinLatency = successfulPings.Min(r => r.Latency!.Value);
+            stats.MaxLatency = successfulPings.Max(r => r.Latency!.Value);
+        }
+        else
+        {
+            stats.MinLatency = long.MaxValue;
+            stats.MaxLatency = 0;
         }
 
         var totalPings = stats.History.Count;
