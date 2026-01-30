@@ -11,9 +11,31 @@ jobs:
   build:
     runs-on: windows-latest
 
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Generate version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            # Use tag version (strip 'v' prefix)
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+            TAG="${{ github.ref_name }}"
+          else
+            # Auto-generate version: 1.0.{run_number}
+            VERSION="1.0.${{ github.run_number }}"
+            TAG="v${VERSION}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -24,46 +46,50 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build -c Release --no-restore
+        run: dotnet build -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       - name: Publish self-contained
-        run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./publish-selfcontained
+        run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:Version=${{ steps.version.outputs.version }} -o ./publish-selfcontained
 
       - name: Publish framework-dependent
-        run: dotnet publish -c Release --no-self-contained -o ./publish-framework-dependent
+        run: dotnet publish -c Release --no-self-contained -p:Version=${{ steps.version.outputs.version }} -o ./publish-framework-dependent
 
       - name: Install WiX Toolset
         run: dotnet tool install --global wix
 
       - name: Build MSI
         run: |
-          wix build installer/Product.wxs -d PublishDir=./publish-framework-dependent -o ./NetworkHealthMonitor.msi
+          wix build installer/Product.wxs -d PublishDir=./publish-framework-dependent -d ProductVersion=${{ steps.version.outputs.version }} -o ./NetworkHealthMonitor-${{ steps.version.outputs.version }}.msi
 
       - name: Zip framework-dependent
-        run: Compress-Archive -Path ./publish-framework-dependent/* -DestinationPath ./NetworkHealthMonitor-FrameworkDependent.zip
+        run: Compress-Archive -Path ./publish-framework-dependent/* -DestinationPath ./NetworkHealthMonitor-${{ steps.version.outputs.version }}-FrameworkDependent.zip
+
+      - name: Rename self-contained exe
+        run: |
+          Copy-Item ./publish-selfcontained/NetworkHealthMonitor.exe ./NetworkHealthMonitor-${{ steps.version.outputs.version }}.exe
 
       - name: Upload self-contained artifact
         uses: actions/upload-artifact@v4
         with:
           name: NetworkHealthMonitor-SelfContained
-          path: ./publish-selfcontained/NetworkHealthMonitor.exe
+          path: ./NetworkHealthMonitor-${{ steps.version.outputs.version }}.exe
 
       - name: Upload framework-dependent artifact
         uses: actions/upload-artifact@v4
         with:
           name: NetworkHealthMonitor-FrameworkDependent
-          path: ./NetworkHealthMonitor-FrameworkDependent.zip
+          path: ./NetworkHealthMonitor-${{ steps.version.outputs.version }}-FrameworkDependent.zip
 
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
           name: NetworkHealthMonitor-MSI
-          path: ./NetworkHealthMonitor.msi
+          path: ./NetworkHealthMonitor-${{ steps.version.outputs.version }}.msi
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
       contents: write
@@ -72,32 +98,14 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
-      - name: Get version info
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          else
-            echo "tag=latest" >> $GITHUB_OUTPUT
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Delete existing latest release
-        if: steps.version.outputs.tag == 'latest'
-        run: gh release delete latest --yes --cleanup-tag || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag == 'latest' && 'Latest Build' || steps.version.outputs.tag }}
-          prerelease: ${{ steps.version.outputs.prerelease }}
+          tag_name: ${{ needs.build.outputs.tag }}
+          name: Release ${{ needs.build.outputs.tag }}
+          prerelease: false
           files: |
-            NetworkHealthMonitor-SelfContained/NetworkHealthMonitor.exe
-            NetworkHealthMonitor-FrameworkDependent/NetworkHealthMonitor-FrameworkDependent.zip
-            NetworkHealthMonitor-MSI/NetworkHealthMonitor.msi
+            NetworkHealthMonitor-SelfContained/*
+            NetworkHealthMonitor-FrameworkDependent/*
+            NetworkHealthMonitor-MSI/*
           generate_release_notes: true
